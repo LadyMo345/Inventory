@@ -35,10 +35,13 @@ if not os.path.exists(csv_path):
     logging.info(f"Directory created: {csv_path}")
 else:
     logging.info(f"Directory already exists: {csv_path}")
+    
+    #function to save data to CSV file 
 def save_to_CSV(data):
     df = pd.DataFrame([data])
     df.to_csv(lab_path, mode='a', index=False, header=not os.path.exists(lab_path) or os.stat(lab_path).st_size == 0)
     
+    #Function to maintain the ID of each item registered
 def unique_item_id(): 
     current_id =set()
     if os.path.exists(lab_path):
@@ -50,12 +53,14 @@ def unique_item_id():
             
             return new_id
          
+         #Function to return page to the welcome page
 def back_func():
     back_button= messagebox.askyesno("Back", "Do you want to return to welcome page?")
     if back_button: 
         return operation()
     else : 
             close() 
+            # Function
 def close():
             cancel = messagebox.askyesno("Cancel", "Do you want to cancel?")
             if cancel: 
@@ -176,7 +181,7 @@ def operation():
                 #close_btn.grid(row=len(labels), column=1, columnspan=4, pady=10, padx=[20,0])
                         
                 top.mainloop()
-            elif option ==3 : 
+            elif option == 3 : 
                 if not os.path.exists(lab_path):
                     messagebox.showinfo("Info", "No inventory file found.")
                 return 
