@@ -1,5 +1,8 @@
 #Import Packages
-import os, logging, random, pandas as pd, numpy as np, tkinter as tk
+import os, logging, random 
+import pandas as pd 
+import numpy as np
+import tkinter as tk
 from faker import Faker
 from datetime import datetime, timedelta
 from tkinter import filedialog, messagebox, simpledialog, ttk
