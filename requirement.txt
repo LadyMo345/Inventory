@@ -1,9 +1,4 @@
 pandas
-numpy
 tkinter
 faker
-random
-sys
-os
-datetime
-logging
+numpy
