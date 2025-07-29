@@ -1,5 +1,5 @@
 #Import Packages
-import os, logging, random 
+import os, logging, random, csv
 import pandas as pd 
 import numpy as np
 import tkinter as tk
@@ -11,6 +11,114 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 logging.basicConfig(
     level=logging.INFO, 
     format='%(asctime)s - %(levelname)s - %(message)s')
+
+current_user = None
+is_master =False 
+
+user_file = "user.csv"
+entries ={}
+
+# Login function for users 
+def register_form (): 
+    reg_frame =tk.Toplevel(root)
+    reg_frame.title("Register")
+    
+    
+def login_window():
+    global current_user 
+    username = simpledialog.askstring("Login", "Enter your username:")
+    password = simpledialog.askstring("Login", "Enter your password:", show ="*")
+    
+    if validate_user(username, password):
+        current_user =username 
+        logging.info(f"logged in as:{current_user}({'Master' if is_master else 'User'})")
+    else: 
+        messagebox.showerror("Login Failed", "Invalid credentials")
+        root.quit()
+
+def validate_user (username, password): 
+    global is_master
+    if not os.path.exists(user_file):
+        return False 
+    
+    with open (user_file, newline ='') as f: 
+        reader = csv.DictReader(f)
+        for row in reader: 
+            if row['username'] == username and row['password'] ==password: 
+                is_master =row['is_master'].lower()=='true'
+                return True
+           
+    return False
+
+def clear_multiple_registration (): 
+    id_username_entry.delete(0,tk.END)
+    id_password_entry.delete(0,tk.END)
+    id_confirm_entry.delete(0,tk.END)
+    reg_is_master.set(False)
+    
+def clear_login_entry (): 
+    login_username_entry.delete(0, tk.END)
+    login_password_entry.delete(0, tk.END)
+    
+    
+def register_user(): 
+    register_form
+    is_master_note= reg_is_master.get()
+    username =id_username_entry.get()
+    password =id_password_entry.get()
+    confirm_password =id_confirm_entry.get()
+#Registration window/frame 
+    reg_frame = tk.Frame(root)
+    
+    tk.Label(reg_frame, text="Username").pack()
+    id_username_entry =tk.Entry(reg_frame)
+    id_username_entry.pack()
+    
+    tk.Label(reg_frame, text="Password").pack()
+    id_password_entry =tk.Entry(reg_frame)
+    id_password_entry.pack()
+    
+    tk.Label(reg_frame, text="Confirm Password").pack()
+    id_confirm_entry =tk.Entry(reg_frame)
+    id_confirm_entry.pack()
+    
+    is_master_note =tk.BooleanVar()
+    
+    is_master_note_checkbox =tk.Checkbutton(reg_frame, tect ="Register as master user", variable =is_master_note)
+    is_master_note_checkbox.pack()
+    
+    tk.Button(reg_frame, text ="Register", command= register_user).pack()
+
+    
+    #Validation 
+    if not username or not password or not confirm_password:
+        messagebox.showerror("Error", "All fields are required")
+        return 
+    if password !=confirm_password:
+        messagebox.showerror("Error", "Passwords does not match.")
+        return
+#Check if user already exist
+    if os.path.exists(user_file): 
+        with open (user_file, newline ='') as f: 
+            reader =csv.DictReader(f)
+            for row in reader:
+                if row['username '] == username:
+                    messagebox.showerror("Error", "Username already exists. ")
+                    return
+    
+#Save  registration to file
+    with open(user_file, "a", newline ='') as f: 
+        writer =csv.writer(f)
+        if os.stat(user_file).st_size == 0:
+            writer.writerow(["userame", "password", "is_master"])
+        writer.writerow([username, password, str(is_master_note)])
+    validate_user
+        
+    messagebox.showinfo("Success", "User registered Successfully.")
+    clear_multiple_registration
+    
+    
+
 
 # Initialize Tkinter
 root = tk.Tk()
@@ -113,6 +221,7 @@ def operation():
                         return 
                     #Update the entered data with generated ID and Date Entered
                     values.update({
+                        "Username": current_user,
                         "item_ID" : unique_item_id(), 
                         "Date_Modified": datetime.now().strftime("%d-%m-%Y, %H:%M"),
                         "Item_Quantity": quantity
@@ -168,6 +277,8 @@ def operation():
                 df['Item_Quantity'] = pd.to_numeric(df['Item_Quantity'], errors='coerce').fillna(0)
                 df.loc[df['item_ID'] == x, 'Item_Quantity'] += qty
                 df.to_csv(lab_path, index=False)
+                if not is_master: 
+                    df =df[df['Username']==current_user]
 
                 item_name = df.loc[df['item_ID'] == x, 'Item Name'].values[0]#Display Item info and the updated quantity
                 total_qty = df.loc[df['item_ID'] == x, 'Item_Quantity'].values[0]
@@ -218,6 +329,9 @@ def operation():
                     #break 
                     df.loc[df['item_ID']== x, 'Item_Quantity']-= qty #Locate Item ID and remove the quantity removed
                     df.to_csv(os.path.join(csv_path, 'Lab.csv'), index = False)#Saves updates
+                    if not is_master: 
+                        df =df[df['Username']==current_user]
+
                     
                     new_qty = df.loc[df['item_ID']== x, 'Item_Quantity'].values[0] 
                     messagebox.showinfo("Info", f"{name} The total item is :{new_qty}")#Displays the remaining quantity
@@ -242,7 +356,7 @@ def operation():
             expected_category = df.loc[df['item_ID'] == x, 'Category'].values[0]
             
             iD_modi = datetime.now().strftime("%d-%m-%Y, %H:%M")
-            messagebox.showinfo("info", f"The item details include :\n Name  : {name} \n Category:  {expected_category},  \n Description: {iDescription},\n Quantity{new_qty} ")  
+            messagebox.showinfo("info", f"The item details include :\n Name  : {name} \n Category:  {expected_category},  \n Description: {iDescription},\n Quantity:{new_qty} ")  
             logging.info("Item details fetched.")
             back_func()
             close() 
@@ -257,6 +371,8 @@ def close():
 
 # Main function
 def main():
+    register_user()
+    login_window()
     operation()
     close()
 
