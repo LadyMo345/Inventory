@@ -1,0 +1,570 @@
+#Import Packages
+import os, logging, random, csv
+import pandas as pd 
+import numpy as np
+import tkinter as tk
+from faker import Faker
+from datetime import datetime, timedelta
+from tkinter import filedialog, messagebox, simpledialog, ttk
+
+# Initialize logging
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Initialize Tkinter
+root = tk.Tk()
+#top= tk.Toplevel(root)
+root.title("Inventory Management System")
+root.geometry("500x400") 
+
+# Initialize Faker
+fake = Faker()
+
+# Set random seed for reproducibility
+np.random.seed(42)
+random.seed(42)
+
+# Paths
+root_path = r'./'
+csv_path = os.path.join(root_path, 'csv')
+lab_path = os.path.join(csv_path, "Lab.csv")
+user_path = os.path.join(csv_path, "user.csv")
+
+#Global variable foruser session 
+current_user = None
+is_master =False 
+
+#Reference for the tkinter entry widget
+login_username_entry =None
+login_password_entry =None 
+registered_username_entry = None 
+registered_password_entry = None 
+registered_confirm_entry = None 
+registered_is_master_var =None 
+welcome_label = None
+
+operation_window = None
+
+#Create directory if it doesn't exist
+def create_create_csvdir(): 
+    if not os.path.exists(csv_path):
+        os.makedirs(csv_path)
+        logging.info(f"Directory created: {csv_path}")
+    else:
+        logging.info(f"Directory already exists: {csv_path}")
+
+
+
+#Save function for users 
+def save_user(username, password, is_master):
+    file_exists = os.path.exists(user_path)
+    with open(user_path, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["username", "password", "is_master"])
+        writer.writerow([username, password, str(is_master)])
+
+def user_exists(username):
+    if not os.path.exists(user_path):
+        return False
+    with open(user_path, newline='') as f:
+        reader = csv.DictReader(f)
+        return any(row['username'] == username for row in reader)
+    
+def validate_user (username, password): 
+    global is_master
+    if not os.path.exists(user_path):
+        return False 
+    
+    with open (user_path, newline ='') as f: 
+        reader = csv.DictReader(f)
+        for row in reader: 
+            if row['username'] == username and row['password'] ==password: 
+                is_master =row['is_master'].lower()=='true'
+                return True
+           
+    return False
+
+entries ={}
+#Frames 
+
+main_frame = tk.Frame(root)
+login_frame = tk.Frame(root)
+register_frame= tk.Frame(root)
+
+for frame in (main_frame, login_frame, register_frame): 
+    frame.grid(row=0, column=0, sticky='nsew')
+    root.columnconfigure(0, weight=1)
+    root.grid_columnconfigure(0, weight=1)
+    frame.columnconfigure(0, weight=1) 
+    
+    #Frame switcher 
+def frame_display(frame): 
+    frame.tkraise()
+
+def login_user():  
+    global login_username_entry, login_password_entry
+    for widget in login_frame.winfo_children():
+        widget.destroy()
+    
+    tk.Label(login_frame, text="Username").pack(pady=(15, 5))
+    login_username_entry = tk.Entry(login_frame, width=30)
+    login_username_entry.pack(pady=5)
+
+    tk.Label(login_frame, text="Password").pack(pady=5)
+    login_password_entry= tk.Entry(login_frame, show="*", width=30)
+    login_password_entry.pack(pady=5)
+    
+    tk.Button(login_frame, text="Login", command=attempt_login, width=15).pack(pady=10)
+    tk.Button(login_frame, text="Register New User", command=lambda: frame_display(register_frame), width =15).pack(pady=5)
+    
+
+def attempt_login():
+    global current_user, is_master
+    username = login_username_entry.get().strip()
+    password = login_password_entry.get().strip()
+        
+    if validate_user(username, password):
+        global current_user
+        current_user = username
+        messagebox.showinfo("Login", f"Welcome {username}!")
+        frame_display(main_frame)
+    else:
+        messagebox.showerror("Error", "Invalid username or password")
+        logging.warning(f"Failed login attempt for user :{username}")
+    clear_login_entry()
+# Registration  function for users 
+
+def Detail_submit(): 
+
+    is_master_flag= registered_is_master_var.get()
+    username =registered_username_entry.get().strip()
+    password =registered_password_entry.get().strip()
+    confirm_password =registered_confirm_entry.get()
+    
+    if not username or not password or not confirm_password:
+        messagebox.showerror("Error", "All fields are required")
+        return 
+    if password !=confirm_password:
+        messagebox.showerror("Error", "Passwords does not match.")
+        return
+    if len(password)< 6: 
+        messagebox.showwarning("Weak Password", "Password should be atleast 6 characters.")
+        return
+    if user_exists (username): 
+        messagebox.showerror("Registration Error", "Username already exists.Please choose another.")
+        return
+    save_user(username, password, is_master_flag)
+    messagebox.showinfo("Registration Success", "User registered successfully. You can log in." )
+    clear_multiple_registration()
+    frame_display(login_frame)
+       
+
+def register_form (): 
+    global registered_username_entry,registered_password_entry,registered_confirm_entry,registered_is_master_var
+    for widget in register_frame.winfo_children():
+       widget.destroy()
+       
+    tk.Label(register_frame, text="Username").pack(pady=(10,5))
+    registered_username_entry =tk.Entry(register_frame, width=30)
+    registered_username_entry.pack(pady=5)
+    
+    tk.Label(register_frame, text="Password").pack(pady=5)
+    registered_password_entry =tk.Entry(register_frame, show='*', width =30)
+    registered_password_entry.pack(pady=5)
+    
+    tk.Label(register_frame, text="Confirm Password").pack(pady=5)
+    registered_confirm_entry =tk.Entry(register_frame, show='*', width=30)
+    registered_confirm_entry.pack(pady=5)
+    
+    registered_is_master_var =tk.BooleanVar()
+    
+    is_master_noted_checkbox =tk.Checkbutton(register_frame, text ="Register as master user", variable =registered_is_master_var)
+    is_master_noted_checkbox.pack(pady=10)
+    tk.Button(register_frame, text="Register", command= Detail_submit, width=15).pack(pady=10)
+    tk.Button(register_frame, text="Back to Login", command=lambda: frame_display(login_frame)).pack(pady=10)
+
+        
+def logout():
+    global current_user, is_master
+    current_user = None
+    is_master = False
+    main_frame.pack_forget()
+    messagebox.showinfo("Logout", "You have been logged out.")
+    frame_display(login_frame)
+    
+
+
+
+def clear_multiple_registration (): 
+    registered_username_entry.delete(0,tk.END)
+    registered_password_entry.delete(0,tk.END)
+    registered_confirm_entry.delete(0,tk.END)
+    registered_is_master_var.set(False)
+    
+def clear_login_entry (): 
+    login_username_entry.delete(0, tk.END)
+    login_password_entry.delete(0, tk.END)
+    
+def save_to_CSV(Data_dict):
+    headers =["Username", "item_ID", "Item Name", "Item Description",
+        "Category", "Source", "Date_Modified", "Item_Quantity"]
+    filename= lab_path
+    write_header =not os.path.exists(filename) or os.stat(filename).st_size ==0
+    with open(filename, "a", newline ='') as f: 
+        writer =csv.DictWriter(f,fieldnames=headers)
+        if write_header:
+            writer.writeheader()
+        writer.writerow(Data_dict)
+    logging.info(f"Item data saved to {filename}: {Data_dict.get('item_ID', 'N/A')}")
+# Inventory Operation
+def main_setup(): 
+    global welcome_label
+    for widget in main_frame.winfo_children(): 
+        widget.destroy()
+    
+    welcome_label =tk.Label(main_frame, text=f"Welcome, {current_user} ({'Master' if is_master else 'User'})!")
+    welcome_label.pack(pady=20)
+    tk.Button(main_frame, text ="Register Item", command =register_item, width=10).pack(pady=5)
+    tk.Button(main_frame, text ="Add Item", command =add_item, width=10).pack(pady=5)
+    tk.Button(main_frame, text ="Withdraw Item", command =withdraw_item, width=10).pack(pady=5)
+    tk.Button(main_frame, text ="delete Item", command =delete_item, width=10).pack(pady=5)  
+    tk.Button(main_frame, text ="view Item", command =view_item, width=10).pack(pady=5)
+     
+    tk.Button(main_frame, text ="Logout", command =logout, width =15).pack(pady=20)
+    
+def register_item(): 
+    global operation_window
+    if operation_window and operation_window.winfo_exists():
+        operation_window.destroy()
+    
+    operation_window =tk.Toplevel(root)
+    operation_window.title("Register Item")
+    
+    labels = ["Item Name", "Item Description","Category", "Source"]
+    entries ={}
+               #Option 1 Panel
+    for i,label in enumerate(labels):
+        label_x = ttk.Label(operation_window, text=label)
+        label_x.grid(row=i, column=0, padx=10, pady= 5, sticky="w")
+        entry = ttk.Entry(operation_window, width=30)
+        entry.grid(row=i, column=1, padx=10, pady=5)
+        entries[label] = entry 
+        
+    def submit_register():
+        values = {label:entry.get().strip() for label, entry in entries. items()}
+        if not all (values.values()):
+            messagebox.showinfo("Error, Please enter all required fields")
+            return
+        quantity = simpledialog.askinteger("Quantity", "Enter Item Quatity:")#For inputing the quantity
+        if quantity is None: 
+            return 
+        if quantity<=0:
+            messagebox.showerror("Error", "Quantity must be a positive number.")
+            return
+    #Update the entered data with generated ID and Date Entered
+        values.update({
+            "Username": current_user,
+            "item_ID" : unique_item_id(), 
+            "Item Name":values["Item Name"],
+            "Item Description": values["Item Description"],
+            "Category": values["Category"],
+            "Source":values["Source"],
+            "Date_Modified": datetime.now().strftime("%d-%m-%Y, %H:%M"),
+            "Item_Quantity": quantity})
+            #All entered data saved
+        save_to_CSV(values)
+        messagebox.showinfo("Success, data saved successfully")
+        operation_window.destroy()
+        frame_display(main_frame)
+    # Submit           
+    submit_btn = ttk.Button(operation_window, text="Submit", command=submit_register)
+    submit_btn.grid(row=len(labels), column=0, columnspan=4, pady=10, padx=[0,20])
+                #Close 
+    close_btn = ttk.Button(operation_window, text="Close", command=close)
+    close_btn.grid(row=len(labels), column=1, columnspan=4, pady=10, padx=[20,0])   
+
+
+def add_item(): 
+    global operation_window
+    if operation_window and operation_window.winfo_exists(): 
+        operation_window.destroy()
+
+    operation_window=tk.Toplevel(root)
+    operation_window.title("Add Item")
+
+    tk.Label(operation_window, text="Item ID:").pack(pady=5)
+    item_id_entry = tk.Entry(operation_window, width=20)
+    item_id_entry.pack(pady=5)
+    def process_add_item():
+        item_id =item_id_entry.get().strip()
+        if not item_id: 
+            messagebox.showerror("Error", "Please enter an Item ID.")
+            return 
+        if not os.path.exists(lab_path):
+            messagebox.showinfo("Info", "No inventory file found.")
+            operation_window.destroy()
+            return 
+        df =pd.read_csv(lab_path)
+        
+        if item_id is None:
+            return
+
+        if item_id not in df['item_ID'].values: #ID is not found in the CSV 
+                messagebox.showinfo("Error", "Item ID not found.")
+                return
+        if not is_master and df.loc[df['item_ID'] == item_id, 'Username'].values[0] != current_user:
+            messagebox.showerror("Permission Denied", "You can only add quantity to your own registered items.")
+            return
+
+       
+
+        qty = simpledialog.askfloat("Input", "Enter quantity to add:")#Add the amount of item to be added
+        if qty is None: 
+            return 
+        if qty <= 0:
+            messagebox.showinfo("Error", "Invalid quantity.")
+            return
+
+                # Convert and update
+        df['Item_Quantity'] = pd.to_numeric(df['Item_Quantity'], errors='coerce').fillna(0)
+        df.loc[df['item_ID'] == item_id, 'Item_Quantity'] += qty
+        df.loc[df['item_ID'] == item_id, 'Date_Modified'] = datetime.now().strftime("%d-%m-%Y, %H:%M") # Update modification date
+        df.to_csv(lab_path, index=False)
+        
+
+        item_name = df.loc[df['item_ID'] == item_id, 'Item Name'].values[0]#Display Item info and the updated quantity
+        total_qty = df.loc[df['item_ID'] == item_id, 'Item_Quantity'].values[0]
+        messagebox.showinfo("Info", f"{item_name} total quantity is now: {total_qty}")
+        logging.info(f"Item{item_id} quantity updated by {current_user}")
+        operation_window.destroy()
+    ttk.Button(operation_window, text=" Add", command=process_add_item).pack(pady=10)
+    ttk.Button(operation_window, text="Close", command=operation_window.destroy).pack(pady=5)
+    
+def withdraw_item():
+    global operation_window
+    if operation_window and operation_window.winfo_exists():
+        operation_window.destroy()
+
+    operation_window = tk.Toplevel(root)
+    operation_window.title("Withdraw Item")
+
+    tk.Label(operation_window, text="Item ID:").pack(pady=5)
+    item_id_entry = tk.Entry(operation_window, width=30)
+    item_id_entry.pack(pady=5)
+
+    def process_withdraw():
+        item_id = item_id_entry.get().strip()
+        if not item_id:
+            messagebox.showerror("Error", "Please enter an Item ID.")
+            return
+
+        if not os.path.exists(lab_path):
+            messagebox.showinfo("Info", "No inventory file found.")
+            operation_window.destroy()
+            return
+
+        df = pd.read_csv(lab_path)
+
+        if item_id not in df['item_ID'].values:
+            messagebox.showerror("Error", "Item ID not found.")
+            return
+
+        # Master user check for withdrawal
+        if not is_master and df.loc[df['item_ID'] == item_id, 'Username'].values[0] != current_user:
+            messagebox.showerror("Permission Denied", "You can only withdraw from your own registered items.")
+            return
+
+        available_qty = float(df.loc[df['item_ID'] == item_id, 'Item_Quantity'].values[0])
+        name = df.loc[df['item_ID'] == item_id, 'Item Name'].values[0]
+
+        while True:
+            qty = simpledialog.askfloat("Withdraw Quantity", f"Enter amount to Withdraw (Available: {available_qty}):", parent=operation_window)
+            if qty is None:
+                return # User cancelled
+            if qty <= 0:
+                messagebox.showerror("Error", "Enter a valid amount (greater than 0).")
+                continue
+            if qty > available_qty:
+                messagebox.showerror("Error", f"Only {available_qty} of '{name}' is available.")
+                continue
+            break # Exit loop if quantity is valid
+
+        df.loc[df['item_ID'] == item_id, 'Item_Quantity'] -= qty
+        df.loc[df['item_ID'] == item_id, 'Date_Modified'] = datetime.now().strftime("%d-%m-%Y, %H:%M") # Update modification date
+        df.to_csv(lab_path, index=False)
+
+        new_qty = df.loc[df['item_ID'] == item_id, 'Item_Quantity'].values[0]
+        messagebox.showinfo("Success", f"'{name}' total quantity is now: {new_qty}")
+        logging.info(f"Item {item_id} withdrawn by {current_user}")
+        operation_window.destroy()
+
+    ttk.Button(operation_window, text="Process Withdraw", command=process_withdraw).pack(pady=10)
+    ttk.Button(operation_window, text="Close", command=operation_window.destroy).pack(pady=5)
+def delete_item():
+    global operation_window
+    if operation_window and operation_window.winfo_exists():
+        operation_window.destroy()
+
+    operation_window = tk.Toplevel(root)
+    operation_window.title("Delete Item")
+
+    tk.Label(operation_window, text="Item ID to Delete:").pack(pady=5)
+    item_id_entry = tk.Entry(operation_window, width=30)
+    item_id_entry.pack(pady=5)
+
+    def process_delete():
+        item_id = item_id_entry.get().strip()
+        if not item_id:
+            messagebox.showerror("Error", "Please enter an Item ID.")
+            return
+
+        if not os.path.exists(lab_path) or os.stat(lab_path).st_size == 0:
+            messagebox.showinfo("Info", "No inventory file found or file is empty.")
+            operation_window.destroy()
+            return
+
+        df = pd.read_csv(lab_path)
+
+        if item_id not in df['item_ID'].values:
+            messagebox.showerror("Error", "Item ID not found.")
+            return
+
+        if not is_master and df.loc[df['item_ID'] == item_id, 'Username'].values[0] != current_user:
+            messagebox.showerror("Permission Denied", "You can only delete your own items.")
+            return
+
+        confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete item with ID: {item_id}?")
+        if confirm:
+            df = df[df['item_ID'] != item_id]
+            df.to_csv(lab_path, index=False)
+            messagebox.showinfo("Success", f"Item {item_id} deleted successfully.")
+            logging.info(f"Item {item_id} deleted by {current_user}.")
+            operation_window.destroy()
+        else:
+            messagebox.showinfo("Cancelled", "Deletion cancelled.")
+
+    ttk.Button(operation_window, text="Delete Item", command=process_delete).pack(pady=10)
+    ttk.Button(operation_window, text="Close", command=operation_window.destroy).pack(pady=5)
+    
+    #Function to maintain the ID of each item registered
+def unique_item_id(): 
+    current_id =set()
+    if os.path.exists(lab_path):
+        df= pd.read_csv(lab_path)
+        current_id = set(df['item_ID'].values)
+    while True :
+        new_id = f"VID_{random.randint(1000, 99999)}"
+        if new_id not in current_id: 
+            
+            return new_id
+        
+def view_item():
+    global operation_window
+    if operation_window and operation_window.winfo_exists():
+        operation_window.destroy()
+
+    operation_window = tk.Toplevel(root)
+    operation_window.title("View Item Details")
+
+    tk.Label(operation_window, text="Item ID to View:").pack(pady=5)
+    item_id_entry = tk.Entry(operation_window, width=30)
+    item_id_entry.pack(pady=5)
+
+    def process_view():
+        item_id = item_id_entry.get().strip()
+        if not item_id:
+            messagebox.showerror("Error", "Please enter an Item ID.")
+            return
+
+        if not os.path.exists(lab_path):
+            messagebox.showinfo("Info", "No inventory file found.")
+            operation_window.destroy()
+            return
+
+        df = pd.read_csv(lab_path)
+
+        if item_id not in df['item_ID'].values:
+            messagebox.showerror("Error", "Item ID not found.")
+            return
+
+        # Master user check for viewing (optional, but good for consistency)
+        if not is_master and df.loc[df['item_ID'] == item_id, 'Username'].values[0] != current_user:
+            messagebox.showerror("Permission Denied", "You can only view details for your own items.")
+            return
+
+        # Extract details
+        item_details = df[df['item_ID'] == item_id].iloc[0]
+        name = item_details['Item Name']
+        description = item_details['Item Description']
+        category = item_details['Category']
+        quantity = item_details['Item_Quantity']
+        source = item_details['Source']
+        date_modified = item_details['Date_Modified']
+        item_username = item_details['Username']
+
+        details_str = (
+            f"Item ID: {item_id}\n"
+            f"Name: {name}\n"
+            f"Category: {category}\n"
+            f"Description: {description}\n"
+            f"Quantity: {quantity}\n"
+            f"Source: {source}\n"
+            f"Date Last Modified: {date_modified}\n"
+            f"Registered by: {item_username}"
+        )
+        messagebox.showinfo("Item Details", details_str)
+        logging.info("Item details fetched.")
+        operation_window.destroy()
+
+    ttk.Button(operation_window, text="View Details", command=process_view).pack(pady=10)
+    ttk.Button(operation_window, text="Close", command=operation_window.destroy).pack(pady=5)
+
+
+         
+         #Function to return page to the welcome page
+def back_func():
+    back_button= messagebox.askyesno("Back", "Do you want to return to welcome page?")
+    if back_button: 
+        return operation()
+    else : 
+            close() 
+            # Function to close the loop
+def item_tab_close():
+            cancel = messagebox.askyesno("Cancel", "Do you want to cancel?")
+            if cancel: 
+             logging.info("Operation cancelled by user.")
+             exit()
+                   
+
+def close():
+    logging.info("Exiting ...")
+    root.quit()
+    #exit()
+
+# Main function
+def main():
+    root.withdraw()
+    create_create_csvdir ()#To ensure csv directory exists
+    login_user()    # This will create login_username_entry
+    register_form() # This will create reg_username_entry
+    #main_frame()
+    if not os.path.exists(user_path) or os.stat(user_path) ==0:
+        messagebox.showinfo("Setup", "No users found. Please register a master user.")
+        frame_display(register_frame)
+    else:
+        main_setup()
+        frame_display(login_frame)
+    root.protocol("WM_DELETE_WINDOW", close) # Handle window close button
+    root.deiconify() # Show the main window
+    root.mainloop() 
+    #root.mainloop()
+
+    
+    #operation()
+    #close()
+
+# Main Execution
+if __name__ == "__main__":
+    main()

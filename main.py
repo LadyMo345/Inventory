@@ -12,17 +12,140 @@ logging.basicConfig(
     level=logging.INFO, 
     format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Initialize Tkinter
+root = tk.Tk()
+top= tk.Toplevel(root)
+root.withdraw()  
+
+# Initialize Faker
+fake = Faker()
+
+# Set random seed for reproducibility
+np.random.seed(42)
+random.seed(42)
+
+# Paths
+root_path = r'./'
+csv_path = os.path.join(root_path, 'csv')
+lab_path = os.path.join(csv_path, "Lab.csv")
+user_path = os.path.join(csv_path, "user.csv")
+
 current_user = None
 is_master =False 
 
 user_file = "user.csv"
 entries ={}
 
-# Login function for users 
+# Registration  function for users 
 def register_form (): 
     reg_frame =tk.Toplevel(root)
-    reg_frame.title("Register")
+    reg_frame.title("Register New User")
+    reg_frame.geometry("300x250")
     
+    tk.Label(reg_frame, text="Username").pack()
+    id_username_entry =tk.Entry(reg_frame)
+    id_username_entry.pack()
+    
+    tk.Label(reg_frame, text="Password").pack()
+    id_password_entry =tk.Entry(reg_frame)
+    id_password_entry.pack()
+    
+    tk.Label(reg_frame, text="Confirm Password").pack()
+    id_confirm_entry =tk.Entry(reg_frame)
+    id_confirm_entry.pack()
+    
+    is_master_note =tk.BooleanVar()
+    
+    is_master_noted_checkbox =tk.Checkbutton(reg_frame, text ="Register as master user", variable =is_master_note)
+    is_master_noted_checkbox.pack()
+    
+    def Detail_submit(): 
+
+        is_master_flag= is_master_note.get().strip()
+        username =id_username_entry.get().strip()
+        password =id_password_entry.get().strip()
+        confirm_password =id_confirm_entry.get()
+    
+        if not username or not password or not confirm_password:
+            messagebox.showerror("Error", "All fields are required")
+            return 
+        if password !=confirm_password:
+            messagebox.showerror("Error", "Passwords does not match.")
+            return
+        if len(password)< 6: 
+            messagebox.showwarning("Weak Password", "Password should be atleast 6 characters.")
+            return
+        for user in upload_users(): 
+            if user['username']==username: 
+                messagebox
+#Check if user already exist
+        if os.path.exists(user_file): 
+            with open (user_file, newline ='') as f: 
+                reader =csv.DictReader(f)
+                for row in reader:
+                    if row['username '] == username:
+                        messagebox.showerror("Error", "Username already exists. ")
+                        return
+    
+#Save  registration to file
+        with open(user_file, "a", newline ='') as f: 
+            writer =csv.writer(f)
+            if os.stat(user_file).st_size == 0:
+                writer.writerow(["userame", "password", "is_master"])
+            writer.writerow([username, password, str(is_master_flag)])
+            
+        messagebox.showinfo("Success", "User registered Successfully.")
+        reg_frame.destroy()
+    tk.Button(reg_frame, text ="Register", command= Detail_submit).pack( pady=10) 
+def upload_users(): 
+    users =[]
+    if os.path.exists(user_file): 
+        with open(user_file, newline='')as f: 
+            reader =csv.DictReader(f)
+            users =list(reader)
+            
+    return users
+def login_user(): 
+    login_win =tk.Toplevel(root)    
+    login_win.title("Login")
+    login_win.geometry("300x200")
+    
+    tk.Label(login_win, text="Username").pack()
+    user_entry = tk.Entry(login_win)
+    user_entry.pack()
+
+    tk.Label(login_win, text="Password").pack()
+    pass_entry = tk.Entry(login_win, show="*")
+    pass_entry.pack()
+
+    def attempt_login():
+        global current_user, is_master
+        username = user_entry.get().strip()
+        password = pass_entry.get().strip()
+        if os.path.exists(user_file):
+            with open(user_file, newline='') as f:
+                for row in csv.DictReader(f):
+                    if row["username"] == username and row["password"] == password:
+                        current_user = username
+                        is_master = row["is_master"].lower() == "true"
+                        messagebox.showinfo("Login Success", f"Welcome {username}")
+                        login_win.destroy()
+                        open_inventory_menu()
+                        return
+        messagebox.showerror("Error", "Invalid credentials")
+
+    tk.Button(login_win, text="Login", command=attempt_login).pack(pady=10)
+    
+def open_inventory_menu():
+    main_menu_frame.pack()
+    welcome_label.config(text=f"Logged in as: {current_user} ({'Master' if is_master else 'User'})")
+    
+def logout():
+    global current_user, is_master
+    current_user = None
+    is_master = False
+    main_menu_frame.pack_forget()
+    messagebox.showinfo("Logout", "You have been logged out.")
     
 def login_window():
     global current_user 
@@ -61,81 +184,7 @@ def clear_login_entry ():
     login_password_entry.delete(0, tk.END)
     
     
-def register_user(): 
-    register_form
-    is_master_note= reg_is_master.get()
-    username =id_username_entry.get()
-    password =id_password_entry.get()
-    confirm_password =id_confirm_entry.get()
-#Registration window/frame 
-    reg_frame = tk.Frame(root)
-    
-    tk.Label(reg_frame, text="Username").pack()
-    id_username_entry =tk.Entry(reg_frame)
-    id_username_entry.pack()
-    
-    tk.Label(reg_frame, text="Password").pack()
-    id_password_entry =tk.Entry(reg_frame)
-    id_password_entry.pack()
-    
-    tk.Label(reg_frame, text="Confirm Password").pack()
-    id_confirm_entry =tk.Entry(reg_frame)
-    id_confirm_entry.pack()
-    
-    is_master_note =tk.BooleanVar()
-    
-    is_master_note_checkbox =tk.Checkbutton(reg_frame, tect ="Register as master user", variable =is_master_note)
-    is_master_note_checkbox.pack()
-    
-    tk.Button(reg_frame, text ="Register", command= register_user).pack()
 
-    
-    #Validation 
-    if not username or not password or not confirm_password:
-        messagebox.showerror("Error", "All fields are required")
-        return 
-    if password !=confirm_password:
-        messagebox.showerror("Error", "Passwords does not match.")
-        return
-#Check if user already exist
-    if os.path.exists(user_file): 
-        with open (user_file, newline ='') as f: 
-            reader =csv.DictReader(f)
-            for row in reader:
-                if row['username '] == username:
-                    messagebox.showerror("Error", "Username already exists. ")
-                    return
-    
-#Save  registration to file
-    with open(user_file, "a", newline ='') as f: 
-        writer =csv.writer(f)
-        if os.stat(user_file).st_size == 0:
-            writer.writerow(["userame", "password", "is_master"])
-        writer.writerow([username, password, str(is_master_note)])
-    validate_user
-        
-    messagebox.showinfo("Success", "User registered Successfully.")
-    clear_multiple_registration
-    
-    
-
-
-# Initialize Tkinter
-root = tk.Tk()
-top= tk.Toplevel(root)
-root.withdraw()  
-
-# Initialize Faker
-fake = Faker()
-
-# Set random seed for reproducibility
-np.random.seed(42)
-random.seed(42)
-
-# Paths
-root_path = r'./'
-csv_path = os.path.join(root_path, 'csv')
-lab_path = os.path.join(csv_path, "Lab.csv")
 
 #Create directory if it doesn't exist
 if not os.path.exists(csv_path):
@@ -145,10 +194,18 @@ else:
     logging.info(f"Directory already exists: {csv_path}")
     
     #function to save data to CSV file 
-def save_to_CSV(data):
-    df = pd.DataFrame([data])
-    df.to_csv(lab_path, mode='a', index=False, header=not os.path.exists(lab_path) or os.stat(lab_path).st_size == 0)
+def save_to_CSV(filename, headers, row):
+    write_header =not os.path.exists(filename) or os.stat(filename).st_size ==0
+    with open(filename, "a", newline ='') as f: 
+        writer =csv.DictWriter(f,fieldnames=headers)
+        if write_header:
+            writer.writeheader()
+        writer.writerow(row)
     
+        
+    '''df = pd.DataFrame([data])
+    df.to_csv(lab_path, mode='a', index=False, header=not os.path.exists(lab_path) or os.stat(lab_path).st_size == 0)
+    '''
     #Function to maintain the ID of each item registered
 def unique_item_id(): 
     current_id =set()
@@ -174,7 +231,8 @@ def close():
             if cancel: 
              logging.info("Operation cancelled by user.")
              exit()
- 
+tk.Button(root, text="Register", command=register_form).pack(pady=5)
+tk.Button(root, text="Login", command=login_user).pack(pady=5) 
                    
 # Inventory Operation
 def operation():
@@ -371,8 +429,11 @@ def close():
 
 # Main function
 def main():
-    register_user()
-    login_window()
+    root.deiconify()
+    choice =messagebox.askquestion("Welcome", "Do you want t register a new user?")
+    if choice =='yes': 
+        register_form()
+    #login_window()
     operation()
     close()
 
